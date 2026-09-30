@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warframe Foundry Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c8a84b; --gold-dim: #8a6f2a; --gold-bright: #e8c86b;
+    --void-black: #07070d; --panel-dark: #0e0e18; --panel-mid: #14141f;
+    --panel-light: #1c1c2e; --panel-hover: #22223a;
+    --border-glow: rgba(200,168,75,0.25); --border-subtle: rgba(200,168,75,0.12);
+    --text-primary: #e8e0cc; --text-muted: #7a7266; --text-dim: #3a3530;
+    --status-ready: #4caf7d; --status-ready-dim: rgba(76,175,125,0.15);
+    --status-lacking: #e05c5c; --status-lacking-dim: rgba(224,92,92,0.15);
+    --status-mastered: #9b7fe8; --status-mastered-dim: rgba(155,127,232,0.15);
+    --status-wishlist: #4fc3f7; --status-wishlist-dim: rgba(79,195,247,0.12);
+    --status-surplus: #e8914b; --status-surplus-dim: rgba(232,145,75,0.13);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--void-black); color: var(--text-primary); font-family: 'Exo 2', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      repeating-linear-gradient(60deg, transparent, transparent 30px, rgba(200,168,75,0.015) 30px, rgba(200,168,75,0.015) 31px),
+      repeating-linear-gradient(120deg, transparent, transparent 30px, rgba(200,168,75,0.015) 30px, rgba(200,168,75,0.015) 31px);
+  }
+
+  /* ── Loading / Auth screens ── */
+  .fullscreen {
+    position: fixed; inset: 0; z-index: 300;
+    background: var(--void-black);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  }
+  .fullscreen.hidden { display: none; }
+  .hidden { display: none !important; }
+
+  .fs-logo { font-family: 'Rajdhani', sans-serif; font-size: 38px; font-weight: 700; letter-spacing: 8px; text-transform: uppercase; color: var(--gold); }
+  .fs-sub { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--text-muted); margin-top: 6px; margin-bottom: 40px; }
+
+  /* Loading bar */
+  .loading-bar-wrap { width: 220px; height: 2px; background: var(--border-subtle); border-radius: 1px; overflow: hidden; margin-bottom: 14px; }
+  .loading-bar { height: 100%; width: 0%; background: var(--gold); transition: width 0.4s ease; }
+  .loading-msg { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); }
+
+  /* Auth card */
+  .auth-card {
+    background: var(--panel-dark); border: 1px solid var(--border-glow); border-top: 2px solid var(--gold);
+    width: 100%; max-width: 400px; padding: 32px 30px 28px;
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  }
+  .auth-tabs { display: flex; gap: 4px; margin-bottom: 28px; }
+  .auth-tab {
+    flex: 1; padding: 8px; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; border: 1px solid var(--border-subtle);
+    background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+    clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  }
+  .auth-tab.active { background: rgba(200,168,75,0.12); color: var(--gold); border-color: var(--gold-dim); }
+  .auth-tab:hover:not(.active) { background: var(--panel-hover); color: var(--text-primary); }
+
+  .auth-form { display: flex; flex-direction: column; gap: 14px; }
+  .auth-form.hidden { display: none; }
+
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); font-weight: 500; }
+  .form-input {
+    background: var(--panel-mid); border: 1px solid var(--border-glow); color: var(--text-primary);
+    font-family: 'Exo 2', sans-serif; font-size: 14px; padding: 9px 12px; border-radius: 2px;
+    outline: none; transition: border-color 0.12s;
+  }
+  .form-input:focus { border-color: var(--gold-dim); }
+
+  .btn-primary {
+    padding: 11px; font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; background: rgba(200,168,75,0.15);
+    border: 1px solid var(--gold-dim); color: var(--gold); cursor: pointer; transition: all 0.15s;
+    clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  }
+  .btn-primary:hover { background: rgba(200,168,75,0.25); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .divider-or {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);
+  }
+  .divider-or::before, .divider-or::after { content:''; flex:1; height:1px; background: var(--border-subtle); }
+
+  .btn-google {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 10px; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; background: var(--panel-mid);
+    border: 1px solid var(--border-glow); color: var(--text-primary); cursor: pointer; transition: all 0.15s;
+    clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  }
+  .btn-google:hover { background: var(--panel-hover); border-color: var(--border-glow); }
+  .btn-google svg { flex-shrink: 0; }
+
+  .auth-error {
+    font-size: 12px; color: var(--status-lacking); background: var(--status-lacking-dim);
+    border: 1px solid rgba(224,92,92,0.2); padding: 8px 12px; border-radius: 2px;
+    display: none; letter-spacing: 0.5px;
+  }
+  .auth-error.visible { display: block; }
+
+  /* ── Main app ── */
+  .app { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 0 20px 60px; }
+
+  header {
+    padding: 24px 0 18px; border-bottom: 1px solid var(--border-glow); margin-bottom: 22px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;
+  }
+  .header-left { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+  .logo-block h1 { font-family: 'Rajdhani', sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--gold); line-height: 1; }
+  .logo-block .subtitle { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-muted); margin-top: 3px; }
+
+  .sync-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); margin-left: 8px; vertical-align: middle; transition: background 0.3s; }
+  .sync-dot.syncing { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+  .sync-dot.synced  { background: var(--status-ready); box-shadow: 0 0 5px var(--status-ready); }
+  .sync-dot.error   { background: var(--status-lacking); box-shadow: 0 0 5px var(--status-lacking); }
+
+  .header-stats { display: flex; gap: 18px; align-items: center; }
+  .hstat { text-align: center; }
+  .hstat-num { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; color: var(--gold); line-height: 1; }
+  .hstat-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-muted); margin-top: 2px; }
+
+  .user-info { display: flex; align-items: center; gap: 10px; }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-glow);
+    background: var(--panel-mid); display: flex; align-items: center; justify-content: center;
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; color: var(--gold);
+    overflow: hidden; flex-shrink: 0;
+  }
+  .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .user-name { font-size: 12px; color: var(--text-muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn-signout {
+    padding: 6px 14px; font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; background: transparent;
+    border: 1px solid var(--border-subtle); color: var(--text-muted); cursor: pointer; transition: all 0.15s; border-radius: 2px;
+  }
+  .btn-signout:hover { border-color: var(--status-lacking); color: var(--status-lacking); background: var(--status-lacking-dim); }
+
+  /* ── Tab bar ── */
+  .tabbar { display: flex; align-items: center; gap: 4px; margin-bottom: 22px; flex-wrap: wrap; }
+  .tab {
+    padding: 8px 18px 8px 14px; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; border: 1px solid var(--border-subtle);
+    background: var(--panel-dark); color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    white-space: nowrap;
+  }
+  .tab:hover { background: var(--panel-hover); color: var(--text-primary); border-color: var(--border-glow); }
+  .tab.active { background: var(--panel-mid); color: var(--gold); border-color: var(--gold-dim); }
+  .tab .tc { display: inline-block; margin-left: 6px; font-size: 10px; padding: 1px 6px; border-radius: 10px; background: rgba(200,168,75,0.1); color: var(--gold-dim); font-family: 'Exo 2', sans-serif; font-weight: 500; }
+  .tab.active .tc { background: rgba(200,168,75,0.2); color: var(--gold); }
+  .global-add-btn {
+    margin-left: auto; padding: 8px 20px; font-family: 'Rajdhani', sans-serif; font-size: 13px;
+    font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    background: rgba(200,168,75,0.12); border: 1px solid var(--gold-dim); color: var(--gold);
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  }
+  .global-add-btn:hover { background: rgba(200,168,75,0.22); }
+
+  /* ── Views ── */
+  .view-section { display: none; }
+  .view-section.active { display: block; }
+
+  /* ── Filter bar ── */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+  .filter-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-right: 2px; }
+  .filter-pill {
+    padding: 5px 13px; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    font-family: 'Rajdhani', sans-serif; font-weight: 600; border: 1px solid var(--border-subtle);
+    background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 2px; transition: all 0.12s; white-space: nowrap;
+  }
+  .filter-pill:hover { background: var(--panel-hover); color: var(--text-primary); border-color: var(--border-glow); }
+  .fp-all     { background: rgba(200,168,75,0.12)!important; color: var(--gold)!important; border-color: var(--gold-dim)!important; }
+  .fp-ready   { background: var(--status-ready-dim)!important; color: var(--status-ready)!important; border-color: rgba(76,175,125,0.3)!important; }
+  .fp-lacking { background: var(--status-lacking-dim)!important; color: var(--status-lacking)!important; border-color: rgba(224,92,92,0.3)!important; }
+  .fp-mastered{ background: var(--status-mastered-dim)!important; color: var(--status-mastered)!important; border-color: rgba(155,127,232,0.3)!important; }
+  .fp-wishlist{ background: var(--status-wishlist-dim)!important; color: var(--status-wishlist)!important; border-color: rgba(79,195,247,0.3)!important; }
+  .search-input {
+    background: var(--panel-mid); border: 1px solid var(--border-subtle); color: var(--text-primary);
+    font-family: 'Exo 2', sans-serif; font-size: 13px; padding: 5px 12px; border-radius: 2px;
+    outline: none; width: 180px; transition: border-color 0.12s; margin-left: auto;
+  }
+  .search-input:focus { border-color: var(--gold-dim); }
+  .search-input::placeholder { color: var(--text-dim); }
+
+  /* ── Category grid ── */
+  .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  @media(max-width:900px){ .category-grid { grid-template-columns: repeat(2,1fr); } }
+  @media(max-width:540px){ .category-grid { grid-template-columns: 1fr; } }
+  .category-col { display: flex; flex-direction: column; gap: 10px; }
+  .category-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 13px; background: var(--panel-dark); border: 1px solid var(--border-glow); border-top: 2px solid var(--gold);
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+  }
+  .cat-name { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); }
+
+  /* ── Equipment card ── */
+  .equip-card {
+    background: var(--panel-mid); border: 1px solid var(--border-subtle); padding: 10px 12px;
+    transition: all 0.15s; clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  }
+  .equip-card:hover { background: var(--panel-hover); border-color: var(--border-glow); }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .equip-name { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 1px; color: var(--text-primary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status-badge { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; font-weight: 600; white-space: nowrap; }
+  .status-badge.ready    { background: var(--status-ready-dim);    color: var(--status-ready); }
+  .status-badge.lacking  { background: var(--status-lacking-dim);  color: var(--status-lacking); }
+  .status-badge.mastered { background: var(--status-mastered-dim); color: var(--status-mastered); }
+  .status-badge.wishlist { background: var(--status-wishlist-dim); color: var(--status-wishlist); }
+  .card-lacking-detail { margin-top: 5px; font-size: 11px; color: var(--status-lacking); opacity: 0.8; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-actions { display: flex; gap: 4px; margin-top: 8px; opacity: 0; transition: opacity 0.15s; }
+  .equip-card:hover .card-actions { opacity: 1; }
+  .card-btn {
+    flex: 1; padding: 4px 0; font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+    font-family: 'Exo 2', sans-serif; font-weight: 500; border: 1px solid var(--border-subtle);
+    background: transparent; color: var(--text-muted); cursor: pointer; border-radius: 2px; transition: all 0.12s;
+  }
+  .card-btn:hover { background: var(--panel-hover); color: var(--text-primary); border-color: var(--border-glow); }
+  .card-btn.del:hover { background: var(--status-lacking-dim); color: var(--status-lacking); border-color: rgba(224,92,92,0.3); }
+
+  /* ── Flat list ── */
+  .flat-list { display: flex; flex-direction: column; gap: 7px; }
+  .flat-card {
+    background: var(--panel-mid); border: 1px solid var(--border-subtle); padding: 10px 14px;
+    display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 12px;
+    transition: all 0.12s; clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  }
+  .flat-card:hover { background: var(--panel-hover); border-color: var(--border-glow); }
+  .flat-name { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 1px; color: var(--text-primary); }
+  .flat-lacking { font-size: 11px; color: var(--status-lacking); font-style: italic; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .section-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0 10px; }
+  .section-divider span { font-family: 'Rajdhani', sans-serif; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  .divider-line { flex: 1; height: 1px; background: var(--border-subtle); }
+  .empty-state { padding: 20px 12px; text-align: center; border: 1px dashed var(--border-subtle); border-radius: 2px; }
+  .empty-state p { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── Surplus ── */
+  .surplus-toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .surplus-add-btn {
+    padding: 8px 18px; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase; background: var(--status-surplus-dim);
+    border: 1px solid rgba(232,145,75,0.35); color: var(--status-surplus); cursor: pointer; transition: all 0.15s;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .surplus-add-btn:hover { background: rgba(232,145,75,0.22); }
+  .surplus-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .surplus-card { background: var(--panel-mid); border: 1px solid var(--border-subtle); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); overflow: hidden; }
+  .surplus-card-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--panel-dark); border-bottom: 1px solid var(--border-subtle); }
+  .surplus-eq-name { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 1px; color: var(--text-primary); }
+  .surplus-eq-cat { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; font-weight: 600; background: var(--status-surplus-dim); color: var(--status-surplus); }
+  .surplus-card-actions { display: flex; gap: 4px; }
+  .surplus-icon-btn { width: 24px; height: 24px; border-radius: 2px; border: 1px solid var(--border-subtle); background: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: all 0.12s; }
+  .surplus-icon-btn:hover { background: var(--panel-hover); color: var(--text-primary); border-color: var(--border-glow); }
+  .surplus-icon-btn.del:hover { background: var(--status-lacking-dim); color: var(--status-lacking); }
+  .surplus-parts { padding: 8px 14px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .surplus-part-row { display: flex; align-items: center; gap: 8px; }
+  .surplus-part-name { flex: 1; font-size: 13px; color: var(--text-primary); }
+  .surplus-part-qty { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; color: var(--status-surplus); min-width: 28px; text-align: right; }
+  .surplus-part-unit { font-size: 10px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; }
+  .qty-btn { width: 20px; height: 20px; border-radius: 2px; border: 1px solid var(--border-subtle); background: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; line-height: 1; transition: all 0.12s; flex-shrink: 0; }
+  .qty-btn:hover { background: var(--panel-hover); color: var(--gold); border-color: var(--border-glow); }
+  .part-del-btn { width: 18px; height: 18px; border-radius: 2px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; font-size: 11px; transition: all 0.12s; }
+  .part-del-btn:hover { color: var(--status-lacking); }
+  .add-part-row { display: flex; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border-subtle); }
+  .part-input { flex: 1; background: var(--panel-dark); border: 1px solid var(--border-subtle); color: var(--text-primary); font-family: 'Exo 2', sans-serif; font-size: 12px; padding: 5px 8px; border-radius: 2px; outline: none; transition: border-color 0.12s; }
+  .part-input:focus { border-color: var(--gold-dim); }
+  .part-input::placeholder { color: var(--text-dim); }
+  .part-qty-input { width: 54px; background: var(--panel-dark); border: 1px solid var(--border-subtle); color: var(--text-primary); font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600; padding: 5px 8px; border-radius: 2px; outline: none; transition: border-color 0.12s; text-align: center; }
+  .part-qty-input:focus { border-color: var(--gold-dim); }
+  .part-add-confirm { padding: 5px 10px; font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; background: rgba(200,168,75,0.1); border: 1px solid var(--gold-dim); color: var(--gold); cursor: pointer; border-radius: 2px; transition: all 0.12s; white-space: nowrap; }
+  .part-add-confirm:hover { background: rgba(200,168,75,0.2); }
+
+  /* ── Modals ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(7,7,13,0.9); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--panel-dark); border: 1px solid var(--border-glow); border-top: 2px solid var(--gold); width: 100%; max-width: 460px; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); padding: 26px 26px 22px; }
+  .modal-title { font-family: 'Rajdhani', sans-serif; font-size: 19px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); margin-bottom: 22px; }
+  .form-select { width: 100%; background: var(--panel-mid); border: 1px solid var(--border-glow); color: var(--text-primary); font-family: 'Exo 2', sans-serif; font-size: 14px; padding: 9px 12px; border-radius: 2px; outline: none; transition: border-color 0.12s; appearance: none; cursor: pointer; }
+  .form-select:focus { border-color: var(--gold-dim); }
+  .form-select option { background: var(--panel-dark); }
+  .lacking-detail-row { display: none; }
+  .lacking-detail-row.visible { display: block; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+  .btn-cancel { padding: 10px 20px; font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; background: transparent; border: 1px solid var(--border-glow); color: var(--text-muted); cursor: pointer; transition: all 0.15s; clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px)); }
+  .btn-cancel:hover { color: var(--text-primary); border-color: var(--border-glow); background: var(--panel-hover); }
+
+  /* ── Migration banner ── */
+  .migration-banner {
+    background: rgba(200,168,75,0.08); border: 1px solid var(--gold-dim); border-left: 3px solid var(--gold);
+    padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .migration-banner p { font-size: 12px; color: var(--gold); letter-spacing: 0.5px; }
+  .migration-banner p span { color: var(--text-muted); font-size: 11px; }
+  .btn-migrate { padding: 7px 16px; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; background: rgba(200,168,75,0.15); border: 1px solid var(--gold-dim); color: var(--gold); cursor: pointer; transition: all 0.15s; border-radius: 2px; white-space: nowrap; }
+  .btn-migrate:hover { background: rgba(200,168,75,0.28); }
+  .btn-migrate-dismiss { padding: 7px 12px; font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; background: transparent; border: 1px solid var(--border-subtle); color: var(--text-muted); cursor: pointer; transition: all 0.15s; border-radius: 2px; white-space: nowrap; }
+  .btn-migrate-dismiss:hover { color: var(--text-primary); }
+
+  /* ── Toast ── */
+  .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--panel-mid); border: 1px solid var(--border-glow); border-left: 3px solid var(--gold); padding: 9px 20px; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); opacity: 0; transition: all 0.3s; z-index: 200; pointer-events: none; white-space: nowrap; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div class="fullscreen" id="screen-loading">
+  <div class="fs-logo">Foundry</div>
+  <div class="fs-sub">Equipment Tracker ◆ Warframe</div>
+  <div class="loading-bar-wrap"><div class="loading-bar" id="loading-bar"></div></div>
+  <div class="loading-msg" id="loading-msg">Initializing...</div>
+</div>
+
+<!-- Auth screen -->
+<div class="fullscreen hidden" id="screen-auth">
+  <div class="fs-logo">Foundry</div>
+  <div class="fs-sub">Equipment Tracker ◆ Warframe</div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-signin">Sign In</button>
+      <button class="auth-tab" id="tab-signup">Register</button>
+    </div>
+
+    <!-- Sign In form -->
+    <div class="auth-form" id="form-signin">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="signin-email" placeholder="tenno@warframe.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="signin-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="signin-error"></div>
+      <button class="btn-primary" id="btn-signin">Enter the Foundry</button>
+      <div class="divider-or">or</div>
+      <button class="btn-google" id="btn-google-signin">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+
+    <!-- Sign Up form -->
+    <div class="auth-form hidden" id="form-signup">
+      <div class="form-group">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" type="text" id="signup-name" placeholder="Tenno name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="signup-email" placeholder="tenno@warframe.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="signup-password" placeholder="Min. 6 characters" autocomplete="new-password">
+      </div>
+      <div class="auth-error" id="signup-error"></div>
+      <button class="btn-primary" id="btn-signup">Create Account</button>
+      <div class="divider-or">or</div>
+      <button class="btn-google" id="btn-google-signup">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div class="app hidden" id="main-app">
+  <header>
+    <div class="header-left">
+      <div class="logo-block">
+        <h1>Foundry <span class="sync-dot" id="sync-dot"></span></h1>
+        <div class="subtitle">Equipment Tracker ◆ Warframe</div>
+      </div>
+      <div class="header-stats">
+        <div class="hstat"><div class="hstat-num" id="stat-total">0</div><div class="hstat-label">Tracked</div></div>
+        <div class="hstat"><div class="hstat-num" id="stat-ready">0</div><div class="hstat-label" style="color:var(--status-ready)">Ready</div></div>
+        <div class="hstat"><div class="hstat-num" id="stat-mastered">0</div><div class="hstat-label" style="color:var(--status-mastered)">Mastered</div></div>
+        <div class="hstat"><div class="hstat-num" id="stat-wishlist">0</div><div class="hstat-label" style="color:var(--status-wishlist)">Wishlist</div></div>
+      </div>
+    </div>
+    <div class="user-info">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <div class="user-name" id="user-name"></div>
+      <button class="btn-signout" id="btn-signout">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- Migration banner -->
+  <div class="migration-banner hidden" id="migration-banner">
+    <p>⬡ Legacy data found <span>— Equipment saved before signing in can be migrated to your account.</span></p>
+    <div style="display:flex;gap:8px">
+      <button class="btn-migrate" id="btn-migrate">Migrate My Data</button>
+      <button class="btn-migrate-dismiss" id="btn-migrate-dismiss">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabbar">
+    <button class="tab active" data-view="foundry">Foundry <span class="tc" id="tc-foundry">0</span></button>
+    <button class="tab" data-view="wishlist">Wishlist <span class="tc" id="tc-wishlist">0</span></button>
+    <button class="tab" data-view="mastered">Mastered <span class="tc" id="tc-mastered">0</span></button>
+    <button class="tab" data-view="all">All <span class="tc" id="tc-all">0</span></button>
+    <button class="tab" data-view="surplus">Surplus <span class="tc" id="tc-surplus">0</span></button>
+    <button class="global-add-btn" id="global-add-btn">+ Add Equipment</button>
+  </div>
+
+  <!-- FOUNDRY VIEW -->
+  <div class="view-section active" id="view-foundry">
+    <div class="filter-bar">
+      <span class="filter-label">Filter:</span>
+      <button class="filter-pill fp-all" data-ff="all">All</button>
+      <button class="filter-pill" data-ff="ready">● Ready</button>
+      <button class="filter-pill" data-ff="lacking">● Lacking</button>
+      <input type="text" class="search-input" id="search-foundry" placeholder="Search…">
+    </div>
+    <div class="category-grid" id="foundry-grid"></div>
+  </div>
+
+  <!-- WISHLIST VIEW -->
+  <div class="view-section" id="view-wishlist">
+    <div class="filter-bar">
+      <input type="text" class="search-input" id="search-wishlist" placeholder="Search wishlist…" style="margin-left:0">
+    </div>
+    <div class="flat-list" id="wishlist-list"></div>
+  </div>
+
+  <!-- MASTERED VIEW -->
+  <div class="view-section" id="view-mastered">
+    <div class="filter-bar">
+      <input type="text" class="search-input" id="search-mastered" placeholder="Search mastered…" style="margin-left:0">
+    </div>
+    <div class="flat-list" id="mastered-list"></div>
+  </div>
+
+  <!-- ALL VIEW -->
+  <div class="view-section" id="view-all">
+    <div class="filter-bar">
+      <span class="filter-label">Status:</span>
+      <button class="filter-pill fp-all" data-af="all">All</button>
+      <button class="filter-pill" data-af="ready">● Ready</button>
+      <button class="filter-pill" data-af="lacking">● Lacking</button>
+      <button class="filter-pill" data-af="mastered">● Mastered</button>
+      <button class="filter-pill" data-af="wishlist">● Wishlist</button>
+      <input type="text" class="search-input" id="search-all" placeholder="Search all…">
+    </div>
+    <div class="flat-list" id="all-list"></div>
+  </div>
+
+  <!-- SURPLUS VIEW -->
+  <div class="view-section" id="view-surplus">
+    <div class="surplus-toolbar">
+      <button class="surplus-add-btn" id="surplus-add-btn">+ Add Surplus Entry</button>
+      <input type="text" class="search-input" id="search-surplus" placeholder="Search surplus…" style="margin-left:auto">
+    </div>
+    <div class="surplus-grid" id="surplus-grid"></div>
+  </div>
+</div>
+
+<!-- EQUIPMENT MODAL -->
+<div class="modal-overlay" id="eq-modal">
+  <div class="modal">
+    <div class="modal-title" id="eq-modal-title">Add Equipment</div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Equipment Name</label>
+      <input class="form-input" type="text" id="eq-name" placeholder="e.g. Rhino, Tigris Prime…">
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Category</label>
+      <select class="form-select" id="eq-cat">
+        <option value="warframe">Warframe</option>
+        <option value="primary">Primary</option>
+        <option value="secondary">Secondary</option>
+        <option value="melee">Melee</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Status</label>
+      <select class="form-select" id="eq-status">
+        <option value="ready">Ready to Build</option>
+        <option value="lacking">Lacking Resources</option>
+        <option value="wishlist">Wishlist</option>
+        <option value="mastered">Mastered</option>
+      </select>
+    </div>
+    <div class="form-group lacking-detail-row" id="lacking-row">
+      <label class="form-label">What are you lacking?</label>
+      <input class="form-input" type="text" id="eq-lacking" placeholder="e.g. Neuroptics Blueprint, 1000 Plastids…">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="eq-modal-save">Confirm</button>
+      <button class="btn-cancel" id="eq-modal-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SURPLUS MODAL -->
+<div class="modal-overlay" id="surplus-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title" id="surplus-modal-title">Add Surplus Entry</div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label class="form-label">Equipment Name</label>
+      <input class="form-input" type="text" id="surplus-eq-name" placeholder="e.g. Soma Prime, Ash…">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label class="form-label">Category</label>
+      <select class="form-select" id="surplus-eq-cat">
+        <option value="warframe">Warframe</option>
+        <option value="primary">Primary</option>
+        <option value="secondary">Secondary</option>
+        <option value="melee">Melee</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="surplus-modal-save">Confirm</button>
+      <button class="btn-cancel" id="surplus-modal-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged,
+  signInWithEmailAndPassword, createUserWithEmailAndPassword,
+  signInWithPopup, GoogleAuthProvider,
+  signOut, updateProfile
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+import {
+  getFirestore, collection, doc,
+  onSnapshot, setDoc, deleteDoc, getDocs, writeBatch
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+// ── Firebase init ──
+const firebaseConfig = {
+  apiKey: "AIzaSyDIkuCvW4RvCjVAHHLjRk1NPNkccxNP0fw",
+  authDomain: "warframe-foundry.firebaseapp.com",
+  projectId: "warframe-foundry",
+  storageBucket: "warframe-foundry.firebasestorage.app",
+  messagingSenderId: "1077295497875",
+  appId: "1:1077295497875:web:ae6984286a679914e9c366"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth  = getAuth(fbApp);
+const db    = getFirestore(fbApp);
+const googleProvider = new GoogleAuthProvider();
+
+// ── State ──
+let currentUser  = null;
+let items        = [];
+let surpluses    = [];
+let editId       = null;
+let editSurplusId = null;
+let currentView  = 'foundry';
+let foundryFilter = 'all';
+let allFilter    = 'all';
+let unsubEquip   = null;
+let unsubSurplus = null;
+
+const CATS = ['warframe','primary','secondary','melee'];
+const CAT_LABELS = { warframe:'Warframe', primary:'Primary', secondary:'Secondary', melee:'Melee' };
+const STATUS_LABELS = { ready:'Ready', lacking:'Lacking', wishlist:'Wishlist', mastered:'Mastered' };
+
+// ── Helpers ──
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+const syncDot = document.getElementById('sync-dot');
+function setSyncing() { syncDot.className = 'sync-dot syncing'; }
+function setSynced()  { syncDot.className = 'sync-dot synced'; setTimeout(()=>syncDot.className='sync-dot',2500); }
+function setSyncErr() { syncDot.className = 'sync-dot error'; }
+
+function setScreen(name) {
+  document.getElementById("screen-loading").classList.toggle("hidden", name !== "loading");
+  document.getElementById("screen-auth").classList.toggle("hidden", name !== "auth");
+  document.getElementById("main-app").classList.toggle("hidden", name !== "main-app");
+}
+
+function setLoadingMsg(pct, msg) {
+  document.getElementById('loading-bar').style.width = pct + '%';
+  document.getElementById('loading-msg').textContent = msg;
+}
+
+// ── User collections ──
+function userEquipCol()   { return collection(db, 'users', currentUser.uid, 'equipment'); }
+function userSurplusCol() { return collection(db, 'users', currentUser.uid, 'surplus'); }
+
+// ── Auth state ──
+onAuthStateChanged(auth, async user => {
+  if (user) {
+    currentUser = user;
+    setLoadingMsg(40, 'Loading your data...');
+    setScreen('loading');
+    updateUserUI(user);
+    await startListeners();
+    checkLegacyData();
+    setScreen('main-app');
+  } else {
+    currentUser = null;
+    stopListeners();
+    setScreen('auth');
+  }
+});
+
+function updateUserUI(user) {
+  const avatarEl = document.getElementById('user-avatar');
+  const nameEl   = document.getElementById('user-name');
+  nameEl.textContent = user.displayName || user.email || 'Tenno';
+  if (user.photoURL) {
+    avatarEl.innerHTML = `<img src="${user.photoURL}" alt="avatar">`;
+  } else {
+    const initial = (user.displayName || user.email || 'T')[0].toUpperCase();
+    avatarEl.textContent = initial;
+  }
+}
+
+// ── Firestore listeners ──
+function startListeners() {
+  return new Promise(resolve => {
+    let equipDone = false, surplusDone = false;
+    const check = () => { if (equipDone && surplusDone) resolve(); };
+
+    unsubEquip = onSnapshot(userEquipCol(), snap => {
+      items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (!equipDone) { equipDone = true; setLoadingMsg(surplusDone?90:65,'Loading equipment...'); check(); }
+      renderAll();
+    }, err => { setSyncErr(); console.error(err); });
+
+    unsubSurplus = onSnapshot(userSurplusCol(), snap => {
+      surpluses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (!surplusDone) { surplusDone = true; setLoadingMsg(equipDone?90:65,'Loading surplus...'); check(); }
+      renderSurplus(); updateTabCounts();
+    }, err => { setSyncErr(); console.error(err); });
+  });
+}
+
+function stopListeners() {
+  if (unsubEquip)   { unsubEquip();   unsubEquip = null; }
+  if (unsubSurplus) { unsubSurplus(); unsubSurplus = null; }
+  items = []; surpluses = [];
+}
+
+// ── CRUD ──
+async function saveEquip(data, id) {
+  setSyncing();
+  try { await setDoc(doc(userEquipCol(), id), data); setSynced(); }
+  catch(e) { setSyncErr(); showToast('Save failed'); throw e; }
+}
+async function deleteEquip(id) {
+  setSyncing();
+  try { await deleteDoc(doc(userEquipCol(), id)); setSynced(); }
+  catch(e) { setSyncErr(); showToast('Delete failed'); }
+}
+async function saveSurplus(data, id) {
+  setSyncing();
+  try { await setDoc(doc(userSurplusCol(), id), data); setSynced(); }
+  catch(e) { setSyncErr(); showToast('Save failed'); throw e; }
+}
+async function deleteSurplus(id) {
+  setSyncing();
+  try { await deleteDoc(doc(userSurplusCol(), id)); setSynced(); }
+  catch(e) { setSyncErr(); showToast('Delete failed'); }
+}
+
+// ── Legacy data migration ──
+async function checkLegacyData() {
+  try {
+    const equipSnap   = await getDocs(collection(db, 'equipment'));
+    const surplusSnap = await getDocs(collection(db, 'surplus'));
+    if (!equipSnap.empty || !surplusSnap.empty) {
+      document.getElementById('migration-banner').classList.remove('hidden');
+    }
+  } catch(e) { /* no legacy data or no access */ }
+}
+
+async function migrateLegacyData() {
+  const btn = document.getElementById('btn-migrate');
+  btn.textContent = 'Migrating...'; btn.disabled = true;
+  try {
+    const batch = writeBatch(db);
+    const equipSnap   = await getDocs(collection(db, 'equipment'));
+    const surplusSnap = await getDocs(collection(db, 'surplus'));
+    equipSnap.forEach(d => {
+      batch.set(doc(userEquipCol(), d.id), d.data());
+      batch.delete(doc(collection(db,'equipment'), d.id));
+    });
+    surplusSnap.forEach(d => {
+      batch.set(doc(userSurplusCol(), d.id), d.data());
+      batch.delete(doc(collection(db,'surplus'), d.id));
+    });
+    await batch.commit();
+    document.getElementById('migration-banner').classList.add('hidden');
+    showToast('Data migrated successfully!');
+  } catch(e) {
+    showToast('Migration failed — check console');
+    console.error(e);
+    btn.textContent = 'Migrate My Data'; btn.disabled = false;
+  }
+}
+
+document.getElementById('btn-migrate').addEventListener('click', migrateLegacyData);
+document.getElementById('btn-migrate-dismiss').addEventListener('click', () => {
+  document.getElementById('migration-banner').classList.add('hidden');
+});
+
+// ── Auth forms ──
+
+// Tab toggle
+document.getElementById('tab-signin').addEventListener('click', () => {
+  document.getElementById('tab-signin').classList.add('active');
+  document.getElementById('tab-signup').classList.remove('active');
+  document.getElementById('form-signin').classList.remove('hidden');
+  document.getElementById('form-signup').classList.add('hidden');
+  clearAuthErrors();
+});
+document.getElementById('tab-signup').addEventListener('click', () => {
+  document.getElementById('tab-signup').classList.add('active');
+  document.getElementById('tab-signin').classList.remove('active');
+  document.getElementById('form-signup').classList.remove('hidden');
+  document.getElementById('form-signin').classList.add('hidden');
+  clearAuthErrors();
+});
+
+function clearAuthErrors() {
+  document.getElementById('signin-error').classList.remove('visible');
+  document.getElementById('signup-error').classList.remove('visible');
+}
+
+function showAuthError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('visible');
+}
+
+function friendlyAuthError(code) {
+  const map = {
+    'auth/user-not-found': 'No account found with that email.',
+    'auth/wrong-password': 'Incorrect password.',
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/email-already-in-use': 'An account with this email already exists.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+    'auth/invalid-email': 'Please enter a valid email address.',
+    'auth/popup-closed-by-user': 'Sign-in popup was closed.',
+    'auth/network-request-failed': 'Network error. Check your connection.',
+  };
+  return map[code] || 'Something went wrong. Please try again.';
+}
+
+// Sign in
+document.getElementById('btn-signin').addEventListener('click', async () => {
+  const email    = document.getElementById('signin-email').value.trim();
+  const password = document.getElementById('signin-password').value;
+  if (!email || !password) { showAuthError('signin-error','Please fill in all fields.'); return; }
+  const btn = document.getElementById('btn-signin');
+  btn.disabled = true; btn.textContent = 'Entering...';
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch(e) {
+    showAuthError('signin-error', friendlyAuthError(e.code));
+    btn.disabled = false; btn.textContent = 'Enter the Foundry';
+  }
+});
+
+// Sign up
+document.getElementById('btn-signup').addEventListener('click', async () => {
+  const name     = document.getElementById('signup-name').value.trim();
+  const email    = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!email || !password) { showAuthError('signup-error','Please fill in all fields.'); return; }
+  const btn = document.getElementById('btn-signup');
+  btn.disabled = true; btn.textContent = 'Creating...';
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    if (name) await updateProfile(cred.user, { displayName: name });
+  } catch(e) {
+    showAuthError('signup-error', friendlyAuthError(e.code));
+    btn.disabled = false; btn.textContent = 'Create Account';
+  }
+});
+
+// Google
+async function googleSignIn() {
+  try { await signInWithPopup(auth, googleProvider); }
+  catch(e) { showAuthError('signin-error', friendlyAuthError(e.code)); }
+}
+document.getElementById('btn-google-signin').addEventListener('click', googleSignIn);
+document.getElementById('btn-google-signup').addEventListener('click', googleSignIn);
+
+// Sign out
+document.getElementById('btn-signout').addEventListener('click', async () => {
+  await signOut(auth);
+  items = []; surpluses = [];
+  showToast('Signed out');
+});
+
+// Enter key support on auth inputs
+['signin-email','signin-password'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('btn-signin').click(); })
+);
+['signup-name','signup-email','signup-password'].forEach(id =>
+  document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('btn-signup').click(); })
+);
+
+// ── Render ──
+function renderAll() {
+  renderFoundry();
+  renderFlatList('wishlist-list', i=>i.status==='wishlist', document.getElementById('search-wishlist').value);
+  renderFlatList('mastered-list', i=>i.status==='mastered', document.getElementById('search-mastered').value);
+  renderAllList();
+  updateStats();
+  updateTabCounts();
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent    = items.length;
+  document.getElementById('stat-ready').textContent    = items.filter(i=>i.status==='ready').length;
+  document.getElementById('stat-mastered').textContent = items.filter(i=>i.status==='mastered').length;
+  document.getElementById('stat-wishlist').textContent = items.filter(i=>i.status==='wishlist').length;
+}
+
+function updateTabCounts() {
+  document.getElementById('tc-foundry').textContent = items.filter(i=>i.status==='ready'||i.status==='lacking').length;
+  document.getElementById('tc-wishlist').textContent = items.filter(i=>i.status==='wishlist').length;
+  document.getElementById('tc-mastered').textContent = items.filter(i=>i.status==='mastered').length;
+  document.getElementById('tc-all').textContent = items.length;
+  document.getElementById('tc-surplus').textContent = surpluses.length;
+}
+
+function renderFoundry() {
+  const sv = document.getElementById('search-foundry').value.toLowerCase();
+  const grid = document.getElementById('foundry-grid');
+  grid.innerHTML = '';
+  const foundryItems = items.filter(i=>i.status==='ready'||i.status==='lacking');
+  CATS.forEach(cat => {
+    const col = document.createElement('div');
+    col.className = 'category-col';
+    col.innerHTML = `<div class="category-header"><span class="cat-name">${CAT_LABELS[cat]}</span></div>`;
+    let catItems = foundryItems.filter(i=>i.category===cat);
+    if (foundryFilter !== 'all') catItems = catItems.filter(i=>i.status===foundryFilter);
+    if (sv) catItems = catItems.filter(i=>i.name.toLowerCase().includes(sv));
+    if (!catItems.length) {
+      col.innerHTML += `<div class="empty-state"><p>No items</p></div>`;
+    } else {
+      catItems.forEach(item => col.appendChild(makeEquipCard(item)));
+    }
+    grid.appendChild(col);
+  });
+}
+
+function makeEquipCard(item) {
+  const card = document.createElement('div');
+  card.className = 'equip-card';
+  card.innerHTML = `
+    <div class="card-top">
+      <div class="equip-name">${esc(item.name)}</div>
+      <span class="status-badge ${item.status}">${STATUS_LABELS[item.status]}</span>
+    </div>
+    ${item.status==='lacking'&&item.lacking?`<div class="card-lacking-detail">⚠ ${esc(item.lacking)}</div>`:''}
+    <div class="card-actions">
+      <button class="card-btn edit-btn">Edit</button>
+      <button class="card-btn del del-btn">Remove</button>
+    </div>`;
+  card.querySelector('.edit-btn').addEventListener('click', ()=>openEqModal(item.id));
+  card.querySelector('.del-btn').addEventListener('click', ()=>{ deleteEquip(item.id); showToast('Removed'); });
+  return card;
+}
+
+function renderFlatList(containerId, filterFn, sv) {
+  const list = document.getElementById(containerId);
+  list.innerHTML = '';
+  const filtered = items.filter(filterFn).filter(i=>i.name.toLowerCase().includes((sv||'').toLowerCase()));
+  if (!filtered.length) { list.innerHTML=`<div class="empty-state"><p>No items found</p></div>`; return; }
+  const byCat = {};
+  CATS.forEach(c => byCat[c] = filtered.filter(i=>i.category===c));
+  CATS.forEach(cat => {
+    if (!byCat[cat].length) return;
+    const div = document.createElement('div');
+    div.className = 'section-divider';
+    div.innerHTML = `<div class="divider-line"></div><span>${CAT_LABELS[cat]}</span><div class="divider-line"></div>`;
+    list.appendChild(div);
+    byCat[cat].forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'flat-card';
+      card.innerHTML = `
+        <div class="flat-name">${esc(item.name)}</div>
+        ${item.status==='lacking'&&item.lacking?`<div class="flat-lacking">⚠ ${esc(item.lacking)}</div>`:'<div></div>'}
+        <span class="status-badge ${item.status}">${STATUS_LABELS[item.status]}</span>
+        <div style="display:flex;gap:4px">
+          <button class="card-btn edit-btn" style="opacity:1;padding:4px 10px">Edit</button>
+          <button class="card-btn del del-btn" style="opacity:1;padding:4px 10px">✕</button>
+        </div>`;
+      card.querySelector('.edit-btn').addEventListener('click',()=>openEqModal(item.id));
+      card.querySelector('.del-btn').addEventListener('click',()=>{ deleteEquip(item.id); showToast('Removed'); });
+      list.appendChild(card);
+    });
+  });
+}
+
+function renderAllList() {
+  const sv = document.getElementById('search-all').value;
+  let fn = ()=>true;
+  if (allFilter !== 'all') fn = i=>i.status===allFilter;
+  renderFlatList('all-list', fn, sv);
+}
+
+function renderSurplus() {
+  const sv = (document.getElementById('search-surplus')?.value||'').toLowerCase();
+  const grid = document.getElementById('surplus-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  let filtered = surpluses;
+  if (sv) filtered = filtered.filter(s=>s.name.toLowerCase().includes(sv));
+  if (!filtered.length) {
+    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><p>No surplus entries</p></div>`;
+    return;
+  }
+  filtered.forEach(s => grid.appendChild(makeSurplusCard(s)));
+}
+
+function makeSurplusCard(s) {
+  const card = document.createElement('div');
+  card.className = 'surplus-card';
+  card.innerHTML = `
+    <div class="surplus-card-header">
+      <div>
+        <div class="surplus-eq-name">${esc(s.name)}</div>
+        <div style="margin-top:3px"><span class="surplus-eq-cat">${CAT_LABELS[s.category]||s.category}</span></div>
+      </div>
+      <div class="surplus-card-actions">
+        <button class="surplus-icon-btn edit-surplus-btn" title="Edit">✎</button>
+        <button class="surplus-icon-btn del surplus-del-btn" title="Delete">✕</button>
+      </div>
+    </div>
+    <div class="surplus-parts" id="parts-${s.id}"></div>`;
+  card.querySelector('.edit-surplus-btn').addEventListener('click',()=>openSurplusModal(s.id));
+  card.querySelector('.surplus-del-btn').addEventListener('click',()=>{ deleteSurplus(s.id); showToast('Surplus removed'); });
+  renderParts(card.querySelector(`#parts-${s.id}`), s);
+  return card;
+}
+
+function renderParts(container, s) {
+  container.innerHTML = '';
+  const parts = s.parts||[];
+  if (!parts.length) {
+    container.innerHTML=`<div style="font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;padding:4px 0 8px">No parts added</div>`;
+  } else {
+    parts.forEach((p, idx) => {
+      const row = document.createElement('div');
+      row.className = 'surplus-part-row';
+      row.innerHTML = `
+        <div class="surplus-part-name">${esc(p.name)}</div>
+        <button class="qty-btn" data-op="dec">−</button>
+        <div class="surplus-part-qty">${p.qty}</div>
+        <button class="qty-btn" data-op="inc">+</button>
+        <span class="surplus-part-unit">pcs</span>
+        <button class="part-del-btn">✕</button>`;
+      row.querySelector('[data-op="dec"]').addEventListener('click',()=>changePart(s,idx,-1));
+      row.querySelector('[data-op="inc"]').addEventListener('click',()=>changePart(s,idx,+1));
+      row.querySelector('.part-del-btn').addEventListener('click',()=>removePart(s,idx));
+      container.appendChild(row);
+    });
+  }
+  const addRow = document.createElement('div');
+  addRow.className = 'add-part-row';
+  addRow.innerHTML = `
+    <input type="text" class="part-input" placeholder="Part name…" id="pname-${s.id}">
+    <input type="number" class="part-qty-input" placeholder="1" value="1" min="1" id="pqty-${s.id}">
+    <button class="part-add-confirm">Add</button>`;
+  addRow.querySelector('.part-add-confirm').addEventListener('click',()=>{
+    const nameEl=document.getElementById(`pname-${s.id}`);
+    const qtyEl=document.getElementById(`pqty-${s.id}`);
+    const name=nameEl.value.trim();
+    const qty=parseInt(qtyEl.value)||1;
+    if(!name){nameEl.focus();return;}
+    addPart(s,name,qty);
+    nameEl.value='';qtyEl.value='1';
+  });
+  addRow.querySelector(`#pname-${s.id}`).addEventListener('keydown',e=>{
+    if(e.key==='Enter') addRow.querySelector('.part-add-confirm').click();
+  });
+  container.appendChild(addRow);
+}
+
+async function changePart(s,idx,delta){
+  const parts=[...(s.parts||[])];
+  parts[idx]={...parts[idx],qty:Math.max(0,parts[idx].qty+delta)};
+  await saveSurplus({...s,parts},s.id);
+}
+async function removePart(s,idx){
+  const parts=(s.parts||[]).filter((_,i)=>i!==idx);
+  await saveSurplus({...s,parts},s.id);
+}
+async function addPart(s,name,qty){
+  const parts=[...(s.parts||[]),{name,qty}];
+  await saveSurplus({...s,parts},s.id);
+  showToast('Part added');
+}
+
+// ── Equipment modal ──
+function openEqModal(id) {
+  editId = id||null;
+  const nameInput   = document.getElementById('eq-name');
+  const catSel      = document.getElementById('eq-cat');
+  const statusSel   = document.getElementById('eq-status');
+  const lackingInput= document.getElementById('eq-lacking');
+  document.getElementById('eq-modal-title').textContent = id ? 'Edit Equipment' : 'Add Equipment';
+  if (id) {
+    const item = items.find(i=>i.id===id);
+    nameInput.value=item.name; catSel.value=item.category;
+    statusSel.value=item.status; lackingInput.value=item.lacking||'';
+  } else {
+    nameInput.value=''; catSel.value='warframe'; statusSel.value='ready'; lackingInput.value='';
+  }
+  toggleLackingRow(statusSel.value);
+  document.getElementById('eq-modal').classList.add('open');
+  nameInput.focus();
+}
+function closeEqModal(){ document.getElementById('eq-modal').classList.remove('open'); editId=null; }
+function toggleLackingRow(s){ document.getElementById('lacking-row').classList.toggle('visible',s==='lacking'); }
+document.getElementById('eq-status').addEventListener('change',e=>toggleLackingRow(e.target.value));
+document.getElementById('eq-modal-save').addEventListener('click', async ()=>{
+  const name   =document.getElementById('eq-name').value.trim();
+  const cat    =document.getElementById('eq-cat').value;
+  const status =document.getElementById('eq-status').value;
+  const lacking=document.getElementById('eq-lacking').value.trim();
+  if(!name){document.getElementById('eq-name').focus();return;}
+  const id=editId||uid();
+  await saveEquip({name,category:cat,status,lacking:status==='lacking'?lacking:''},id);
+  showToast(editId?'Equipment updated':'Equipment added');
+  closeEqModal();
+});
+document.getElementById('eq-modal-cancel').addEventListener('click',closeEqModal);
+document.getElementById('eq-modal').addEventListener('click',e=>{if(e.target===document.getElementById('eq-modal'))closeEqModal();});
+
+// ── Surplus modal ──
+function openSurplusModal(id){
+  editSurplusId=id||null;
+  document.getElementById('surplus-modal-title').textContent=id?'Edit Surplus Entry':'Add Surplus Entry';
+  const nameInput=document.getElementById('surplus-eq-name');
+  const catSel=document.getElementById('surplus-eq-cat');
+  if(id){const s=surpluses.find(s=>s.id===id);nameInput.value=s.name;catSel.value=s.category;}
+  else{nameInput.value='';catSel.value='warframe';}
+  document.getElementById('surplus-modal').classList.add('open');
+  nameInput.focus();
+}
+function closeSurplusModal(){document.getElementById('surplus-modal').classList.remove('open');editSurplusId=null;}
+document.getElementById('surplus-modal-save').addEventListener('click',async()=>{
+  const name=document.getElementById('surplus-eq-name').value.trim();
+  const cat=document.getElementById('surplus-eq-cat').value;
+  if(!name){document.getElementById('surplus-eq-name').focus();return;}
+  const id=editSurplusId||uid();
+  const existing=editSurplusId?(surpluses.find(s=>s.id===id)||{}):{};
+  await saveSurplus({name,category:cat,parts:existing.parts||[]},id);
+  showToast(editSurplusId?'Entry updated':'Surplus entry created');
+  closeSurplusModal();
+});
+document.getElementById('surplus-modal-cancel').addEventListener('click',closeSurplusModal);
+document.getElementById('surplus-modal').addEventListener('click',e=>{if(e.target===document.getElementById('surplus-modal'))closeSurplusModal();});
+
+// ── Global add button ──
+document.getElementById('global-add-btn').addEventListener('click',()=>{
+  if(currentView==='surplus') openSurplusModal(null);
+  else openEqModal(null);
+});
+document.getElementById('surplus-add-btn').addEventListener('click',()=>openSurplusModal(null));
+
+// ── Tabs ──
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.view-section').forEach(v=>v.classList.remove('active'));
+    tab.classList.add('active');
+    currentView=tab.dataset.view;
+    document.getElementById('view-'+currentView).classList.add('active');
+    document.getElementById('global-add-btn').textContent=currentView==='surplus'?'+ Add Surplus Entry':'+ Add Equipment';
+    renderAll();
+    if(currentView==='surplus') renderSurplus();
+  });
+});
+
+// ── Filters ──
+document.querySelectorAll('[data-ff]').forEach(pill=>{
+  pill.addEventListener('click',()=>{
+    document.querySelectorAll('[data-ff]').forEach(p=>p.className='filter-pill');
+    foundryFilter=pill.dataset.ff;
+    pill.classList.add('fp-'+foundryFilter);
+    renderFoundry();
+  });
+});
+document.querySelectorAll('[data-af]').forEach(pill=>{
+  pill.addEventListener('click',()=>{
+    document.querySelectorAll('[data-af]').forEach(p=>p.className='filter-pill');
+    allFilter=pill.dataset.af;
+    pill.classList.add('fp-'+allFilter);
+    renderAllList();
+  });
+});
+
+// ── Search ──
+document.getElementById('search-foundry').addEventListener('input',renderFoundry);
+document.getElementById('search-wishlist').addEventListener('input',()=>renderFlatList('wishlist-list',i=>i.status==='wishlist',document.getElementById('search-wishlist').value));
+document.getElementById('search-mastered').addEventListener('input',()=>renderFlatList('mastered-list',i=>i.status==='mastered',document.getElementById('search-mastered').value));
+document.getElementById('search-all').addEventListener('input',renderAllList);
+document.getElementById('search-surplus').addEventListener('input',renderSurplus);
+
+// ── Keyboard ──
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeEqModal();closeSurplusModal();}});
+</script>
+</body>
+</html>
